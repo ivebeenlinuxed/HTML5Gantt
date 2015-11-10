@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head></head>
+<body>
+<!-- Template for the Gantt Chart Scaffolding -->
+<template id="gantt-scaffold">
+	<style type="text/css">
+@CHARSET "UTF-8";
+
+#gantt-insertpos {
+	display: block;
+}
+
+#gantt {
+	border: 1px solid #eceeef;
+	border-radius: 5px;
+	padding: 5px;
+}
+
+#gantt-times>div {
+	display: flex;
+	border-bottom: 1px solid #eceeef;
+}
+
+#gantt-times>div>div {
+	flex: 1;
+	vertical-align: middle;
+}
+
+#gantt-title {
+	display: inline-block;
+	width: 200px;
+	float: left;
+}
+
+#gantt-times {
+	display: inline-block;
+	width: calc(100% - 200px);
+}
+</style>
+	<div id="gantt-insertpos">
+		<div id="gantt">
+			<div id="gantt-header">
+				<div id="gantt-title">
+					<content select="gantt-title">&nbsp;</content>
+				</div>
+				<div id="gantt-times">
+					<div>
+						<!-- FIXME if the date range is not a day, this should be built to represent the right timeframe -->
+						<div>00:00</div>
+						<div>01:00</div>
+						<div>02:00</div>
+						<div>03:00</div>
+						<div>04:00</div>
+						<div>05:00</div>
+						<div>06:00</div>
+						<div>07:00</div>
+						<div>08:00</div>
+						<div>09:00</div>
+						<div>10:00</div>
+						<div>11:00</div>
+						<div>12:00</div>
+						<div>13:00</div>
+						<div>14:00</div>
+						<div>15:00</div>
+						<div>16:00</div>
+						<div>17:00</div>
+						<div>18:00</div>
+						<div>19:00</div>
+						<div>20:00</div>
+						<div>21:00</div>
+						<div>22:00</div>
+						<div>23:00</div>
+					</div>
+				</div>
+			</div>
+			<content select="gantt-row"> </content>
+		</div>
+	</div>
+	</template>
+	<!-- Scaffold for a Gantt Row -->
+	<template id="gantt-row">
+	<style type="text/css">
+#gantt-row {
+	height: 70px;
+}
+
+#gantt-barcontainer {
+	padding: 0 !important;
+	margin-left: 200px;
+}
+
+#gantt-barcontainer>div {
+	height: 70px;
+	position: relative;
+}
+
+#gantt-titlecontainer {
+	vertical-align: middle !important;
+	width: 200px;
+	float: left;
+}
+
+#gantt-nowline {
+	background-color: transparent !important;
+	border-right: 1px solid #555;
+	position: absolute;
+	height: 100%;
+}
+</style>
+	<div id="gantt-row">
+		<div id="gantt-titlecontainer">
+			<content select="gantt-title"></content>
+		</div>
+		<div id="gantt-barcontainer">
+			<div>
+				<div id="gantt-nowline" style="margin-left: 0;"></div>
+				<content></content>
+			</div>
+		</div>
+	</div>
+	</template>
+	<!-- Very Simple... -->
+	<template id="gantt-title">
+	<div id="gantt-title">
+		<content></content>
+	</div>
+	</template>
+	<!-- The Gantt Bars -->
+	<template id="gantt-bar-templ">
+	<style type="text/css">
+#gantt-bar.draggable #gantt-extender {
+	float: right;
+	width: 8px;
+	height: 100%;
+	background-color: rgba(255, 255, 255, 0.2);
+	cursor: e-resize;
+}
+
+#gantt-text {
+	position: absolute;
+	height: 70px;
+	z-index: 1000;
+	width: 100%;
+}
+
+#gantt-bar.draggable #gantt-text {
+	position: absolute;
+	height: 70px;
+	z-index: 1000;
+	width: calc(100% - 10px);
+}
+
+
+
+#gantt-bar {
+	position: absolute;
+	height: 70px;
+	overflow: hidden;
+	background-color: #eee;
+	border: 1px #555 solid;
+}
+
+@keyframes gantt-bar-stripes {
+  from {
+    background-position: -56px 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+#gantt-barprog {
+	position: absolute;
+	height: 70px;
+	z-index: 999;
+	overflow: hidden;
+}
+
+#gantt-barprog > div {
+	background-image: repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(255
+		, 255, 255, 0.2) 10px, rgba(255, 255, 255, 0.2) 20px);
+	background-repeat: repeat-x;
+	animation: gantt-bar-stripes 2s linear infinite;
+	width: 1000%;
+	height: 70px;
+}
+</style>
+	<div id="gantt-bar"
+		style="width: 50%; margin-left: 25%">
+		<div id="gantt-extender"></div>
+		<div id="gantt-barprog" style="width: 0;">
+			<div></div>
+		</div>
+		<div id="gantt-text">
+			<content> </content>
+		</div>
+	</div>
+	</template>
+	<script type="text/javascript">
+	/**
+ * 
+ */
+"use strict";
+
+var ganttImportDoc = document.currentScript.ownerDocument;
+
+class WidgetGantt extends HTMLElement {
+	
+	attachedCallback() {
+		this.drag_handle = null;
+		
+		this.start = new Date(this.getAttribute("start"));
+		this.end = new Date(this.getAttribute("end"));
+
+		
+		
+		
+		this.BuildDOM();
+		
+		this.addEventListener("dragstart", function(e) {
+			e.preventDefault();
+		});
+		
+		this.addEventListener("DOMAttrModified", function(e) {
+			this.AttributesChanged();
+		});
+		
+		this.AttributesChanged();
+		
+	}
+	
+	AttributesChanged() {
+		var req_snap = this.getAttribute("snap");
+		if (req_snap != null) {
+			this.snap = req_snap;
+		} else {
+			this.snap = 15*60*1000;
+		}
+		
+		var req_create_min = this.getAttribute("create-min");
+		if (req_create_min != null) {
+			this.create_min_size = req_create_min;
+		} else {
+			this.create_min_size = 30*60*1000;
+		}
+		
+		var resize_min_size = this.getAttribute("resize-min");
+		if (resize_min_size != null) {
+			this.resize_min_size = resize_min_size;
+		} else {
+			this.resize_min_size = 60*60*1000;
+		}
+	}
+	
+	BuildDOM() {
+		
+		var importDoc = ganttImportDoc;
+		
+		var shadow = this.createShadowRoot();
+		var template_scaffold = importDoc.querySelector('#gantt-scaffold');
+		shadow.appendChild(template_scaffold.content.cloneNode(true));
+		
+	}
+}
+
+document.registerElement('gantt-chart', {
+	prototype: WidgetGantt.prototype
+});
+
+class WidgetGanttRow extends HTMLElement {
+	attachedCallback() {
+		var importDoc = ganttImportDoc;
+		
+		var shadow = this.createShadowRoot();
+		var template_scaffold = importDoc.querySelector('#gantt-row');
+		shadow.appendChild(template_scaffold.content.cloneNode(true));
+		
+
+		
+
+		this.addEventListener("mousedown", function(e) {
+			e.preventDefault();
+			if (e.target.matches("gantt-row")) {
+				this.drag_baradd_start(e);
+			}
+		});
+		
+		this.addEventListener("mousemove", function(e) {
+			if (this.drag_handle == null) {
+				return;
+			}
+			if (this.drag_handle.type=="bar_add") {
+				this.drag_baradd_move(e);
+			}
+		});
+		
+		this.addEventListener("mouseup", function(e) {
+			if (this.drag_handle == null) {
+				return;
+			}
+			
+			if (this.drag_handle.type=="bar_add") {
+				this.drag_baradd_end(e);
+			}
+			
+			this.drag_handle = null;
+		});
+		this.shadow = shadow;
+		
+		
+		var gantt = this.getGanttChart();
+		var now = new Date();
+		if (gantt.start < now && now < gantt.end) {
+			shadow.querySelector("#gantt-nowline").style.marginLeft = ((now-gantt.start)/(gantt.end-gantt.start)*100)+"%";
+		} else {
+			shadow.querySelector("#gantt-nowline").remove();
+		}
+		
+		
+	}
+	
+	getGanttChart() {
+		return this.closest("gantt-chart");
+	}
+	
+	getGanttUsableWidth() {
+		return this.shadow.querySelector("#gantt-barcontainer").offsetWidth
+	}
+	
+
+	drag_baradd_start(e) {
+		var usableOffsetX = this.shadow.querySelector("#gantt-titlecontainer").offsetWidth;
+		var start = new Date(this.getGanttChart().start.getTime()+(e.offsetX-usableOffsetX)*this.getMillisecondsPerPixel());
+		
+		start = this.SnapTime(start);
+		
+		var end = new Date(start.getTime()+this.getGanttChart().create_min_size);
+		
+		
+		var el = document.createElement("gantt-bar");
+		e.target.appendChild(el);
+		el.start = start;
+		el.end = end;
+		
+		
+		var dh = new Object();
+		dh.type = "bar_add";
+		dh.el = el;
+		dh.originalScreenX = e.screenX;
+		this.drag_handle = dh;
+	}
+	
+	drag_baradd_move(e) {
+		var offsetX = e.screenX-this.drag_handle.originalScreenX;
+		
+		var start_time = this.drag_handle.el.start;
+		
+		var end_time = new Date(start_time.getTime()+this.getMillisecondsPerPixel()*offsetX);
+		
+		end_time = this.SnapTime(end_time);
+		
+
+		if (end_time-start_time < this.getGanttChart().create_min_size) {
+			end_time = new Date(start_time.getTime()+this.getGanttChart().create_min_size);
+		}
+		
+		this.drag_handle.el.end = end_time;
+	}
+	
+	drag_baradd_end(e) {
+		e = new Event("bar.add", {"bubbles":true});
+		e.end_event = e;
+		this.drag_handle.el.dispatchEvent(e);
+	}
+	
+
+	getGanttChartSnap() {
+		var gantt_chart = this.getGanttChart();
+		return gantt_chart.snap;
+	}
+	
+	getGanttChart() {
+		return this.closest("gantt-chart");
+	}
+	
+	SnapTime(time) {
+		var snap_point = this.getGanttChartSnap();
+		var snap_offset = time%snap_point;
+		
+		if (snap_offset > snap_point/2) {
+			snap_offset -= snap_point;
+		}
+		
+		return new Date(time.getTime()-snap_offset);
+	}
+	
+
+	
+	getPixelsPerMillisecond() {
+		var gantt_parent = this.getGanttChart();
+		return this.getGanttUsableWidth()/(gantt_parent.end-gantt_parent.start);
+	}
+	
+	getMillisecondsPerPixel() {
+		return 1/this.getPixelsPerMillisecond();
+	}
+}
+
+
+document.registerElement("gantt-row", {
+	prototype: WidgetGanttRow.prototype
+});
+
+class WidgetGanttBar extends HTMLElement {
+	attachedCallback() {
+		var importDoc = ganttImportDoc;
+		
+		var shadow = this.createShadowRoot();
+		var template_scaffold = importDoc.querySelector('#gantt-bar-templ');
+		shadow.appendChild(template_scaffold.content.cloneNode(true));
+		
+		
+		
+		
+		
+		
+
+		shadow.addEventListener("mousedown", (e) => {
+			e.preventDefault();
+			if (!this.hasAttribute("draggable")) {
+				return;
+			}
+			if (e.target.matches("#gantt-extender")) {
+				this.drag_barresize_start(e);
+			} else {
+				this.drag_barmove_start(e);
+			}
+			
+		});
+		
+		var gantt_parent = this.closest("gantt-chart");
+		
+		gantt_parent.addEventListener("mousemove", (e) => {
+			if (this.drag_handle == null) {
+				return;
+			}
+			if (this.drag_handle.type=="bar_resize") {
+				this.drag_barresize_move(e);
+			} else if (this.drag_handle.type == "bar_move") {
+				this.drag_barmove_move(e);
+			}
+		});
+		
+		gantt_parent.addEventListener("mouseup", (e) => {
+			if (this.drag_handle == null) {
+				return;
+			}
+			
+			if (this.drag_handle.type=="bar_resize") {
+				this.drag_barresize_end(e);
+			} else if (this.drag_handle.type == "bar_move") {
+				this.drag_barmove_end(e);
+			}
+			
+			this.drag_handle = null;
+		});
+		
+		this.shadow = shadow;
+		
+		this._observer = new MutationObserver((mutations) => {
+			this.AttributesChanged();
+		});
+		
+		this._observer.observe(this, {attributes: true});
+		
+		this.AttributesChanged();
+		
+	}
+	
+	getGanttChart() {
+		return this.closest("gantt-chart");
+	}
+	
+	detachedCallback() {
+		this._observer.disconnect();
+	}
+	
+	set start (s) {
+		if (this.getAttribute("start") != s.toString()) {
+			this.setAttribute("start", s.toString());
+		}
+		this._start = s;
+		if (this.end != null) {
+			this.UpdateBarTime();
+		}
+	}
+	
+	get start () {
+		return this._start;
+	}
+	
+	set end (e) {
+		if (this.getAttribute("end") != e.toString()) {
+			this.setAttribute("end", e.toString());
+		}
+		
+		this._end = e;
+		this.UpdateBarTime();
+	}
+	
+	get end () {
+		return this._end;
+	}
+	
+	set progress (p) {
+		if (!this.hasAttribute("progress") || this.getAttribute("progress").replace("%", "") != p) {
+			this.setAttribute("progress", p+"%");
+		}
+		
+		this._progress = p;
+		this.UpdateBarProgress();
+	}
+	
+	get progress () {
+		return this._progress;
+	}
+	
+	set draggable (d) {
+		if (d != false) {
+			d = true;
+		} else {
+			d = false;
+		}
+		if (!this.hasAttribute("draggable") && d) {
+			this.setAttribute("draggable", true);
+		} else if (this.hasAttribute("draggable") && !d) {
+			this.removeAttribute("draggable");
+		}
+		
+		this._draggable = d;
+		this.UpdateBarDraggable();
+	}
+	
+	get draggable () {
+		return this._draggable;
+	}
+	
+	AttributesChanged() {
+		var req_start = new Date(this.getAttribute("start"));
+		if (req_start != this.start) {
+			this.start = req_start; 
+		}
+		
+		var req_end = new Date(this.getAttribute("end"));
+		if (req_end != this.end) {
+			this.end = req_end; 
+		}
+		
+		if (this.hasAttribute("progress")) {
+			var req_progress = this.getAttribute("progress").replace("%", "");
+			if (req_progress != this.progress) {
+				this.progress = req_progress; 
+			}
+		}
+		
+		if (this.hasAttribute("draggable") != this.draggable) {
+			this.draggable = this.hasAttribute("draggable"); 
+		}
+	}
+	
+
+	
+	drag_barmove_start(e) {
+		var dh = new Object();
+		dh.type = "bar_move";
+		
+		dh.originalScreenX = e.screenX;
+		dh.originalStart = this.start;
+		dh.duration = this.end-this.start;
+		this.drag_handle = dh;
+	}
+	
+	drag_barmove_move(e) {
+		var offsetX = e.screenX-this.drag_handle.originalScreenX;
+		
+		var new_start = new Date(this.drag_handle.originalStart.getTime()+offsetX*this.getMillisecondsPerPixel());
+		
+		new_start = this.SnapTime(new_start, this.snap);
+
+		var new_end = new Date(new_start.getTime()+this.drag_handle.duration);
+		this.start = new_start;
+		this.end = new_end;
+	}
+	
+	drag_barmove_end(e) {
+		e = new Event("bar.move", {"bubbles":true});
+		e.end_event = e;
+		this.dispatchEvent(e);
+	}
+	
+	
+	
+	
+	drag_barresize_start(e) {
+		var dh = new Object();
+		dh.type = "bar_resize";
+		dh.originalScreenX = e.screenX;
+		
+		
+		if (this.end-this.start < this.resize_min_size) {
+			dh.min_size = this.end-this.start;
+		} else {
+			dh.min_size = this.resize_min_size;
+		}
+		
+		dh.originalEnd = this.end;
+		this.drag_handle = dh;
+		
+	}
+	
+	drag_barresize_move(e) {
+		var offsetX = e.screenX-this.drag_handle.originalScreenX;
+		var end_time = new Date(this.drag_handle.originalEnd.getTime()+(this.getMillisecondsPerPixel()*offsetX));
+		
+		end_time = this.SnapTime(end_time);
+		
+		if (end_time.getTime()-this.start.getTime() < this.drag_handle.min_size) {
+			end_time = new Date(this.start.getTime()+this.drag_handle.min_size);
+		}
+		this.setAttribute("end", end_time);
+	}
+	
+	drag_barresize_end(e) {
+		e = new Event("bar.resize", {"bubbles":true});
+		e.end_event = e;
+		this.dispatchEvent(e);
+	}
+	
+	getGanttChartSnap() {
+		var gantt_chart = this.getGanttChart();
+		return gantt_chart.snap;
+	}
+	
+	SnapTime(time) {
+		var snap_point = this.getGanttChartSnap();
+		var snap_offset = time%snap_point;
+		
+		if (snap_offset > snap_point/2) {
+			snap_offset -= snap_point;
+		}
+		
+		return new Date(time.getTime()-snap_offset);
+	}
+	
+	getTimeAtPixelOffset(pix) {
+		return getMillisecondPerPix()*pix;
+	}
+	
+	getPixelByOffset(milli) {
+		return getPixPerMillisecond()*milli;
+	}
+	
+	UpdateBarTime() {
+		if (this.querySelector(".label-start")) {
+			this.querySelector(".label-start").innerHTML = (("0"+this.start.getHours()).slice(-2))+":"+(("0"+this.start.getMinutes()).slice(-2));
+		}
+		
+		if (this.querySelector(".label-end")) {
+			this.querySelector(".label-end").innerHTML = (("0"+this.end.getHours()).slice(-2))+":"+(("0"+this.end.getMinutes()).slice(-2));
+		}
+		
+		var gantt_parent = this.getGanttChart();
+		this.shadow.querySelector("#gantt-bar").style.marginLeft = ((this.start-gantt_parent.start)/(gantt_parent.end-gantt_parent.start)*100)+"%";
+		this.shadow.querySelector("#gantt-bar").style.width = ((this.end-this.start)/(gantt_parent.end-gantt_parent.start)*100)+"%";
+	}
+	
+	UpdateBarProgress() {
+		this.shadow.querySelector("#gantt-barprog").style.width = this.progress+"%";
+	}
+	
+	UpdateBarDraggable() {
+		var cl = this.shadow.querySelector("#gantt-bar").classList;
+		if (!this.draggable && cl.contains("draggable")) {
+			cl.remove("draggable");
+		}
+		
+		if (this.draggable && !cl.contains("draggable")) {
+			cl.add("draggable");
+		}
+	}
+	
+	getPixelsPerMillisecond() {
+		var gantt_parent_row = this.closest("gantt-row");
+		var gantt_parent = this.getGanttChart();
+		return gantt_parent_row.getGanttUsableWidth()/(gantt_parent.end-gantt_parent.start);
+	}
+	
+	getMillisecondsPerPixel() {
+		return 1/this.getPixelsPerMillisecond();
+	}
+}
+
+document.registerElement("gantt-bar", {
+	prototype: WidgetGanttBar.prototype
+});
+	</script>
+</body>
+</html>
